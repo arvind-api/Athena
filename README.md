@@ -13,7 +13,7 @@
 ---
 ## Dashboard
 
-![ATHENA Dashboard](docs/dashboard.png)git add README.md
+![ATHENA Dashboard](docs/dashboard.png)
 
 ## Overview
 
