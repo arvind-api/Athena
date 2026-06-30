@@ -11,6 +11,9 @@
 ![Research](https://img.shields.io/badge/Research-Cognitive%20Architecture-purple)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ---
+## Dashboard
+
+![ATHENA Dashboard](docs/dashboard.png)git add README.md
 
 ## Overview
 
