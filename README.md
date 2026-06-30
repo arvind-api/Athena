@@ -3,7 +3,13 @@
 ### *Autonomous Thought Heuristic Engine for Neural Abstraction*
 
 > **An experimental local-first cognitive architecture exploring persistent memory, symbolic abstraction, and self-organizing knowledge structures — built to run entirely on consumer hardware.**
-
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi)
+![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite)
+![Local AI](https://img.shields.io/badge/Runs-100%25%20Local-success)
+![CPU Only](https://img.shields.io/badge/CPU-Only-orange)
+![Research](https://img.shields.io/badge/Research-Cognitive%20Architecture-purple)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 ---
 
 ## Overview
