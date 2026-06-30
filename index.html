@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATHENA — Live Dashboard</title>
+
+<!-- D3.js v7 from cdnjs — no local install required -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════════════ */
+:root {
+  --bg:          #0a0a0f;
+  --panel-bg:    rgba(255,255,255,0.025);
+  --border:      rgba(0,255,255,0.12);
+  --cyan:        #00ffff;
+  --purple:      #a855f7;
+  --green:       #00ff88;
+  --orange:      #ff6b35;
+  --white:       #ffffff;
+  --dim:         rgba(255,255,255,0.45);
+  --header-h:    64px;
+  --footer-h:    70px;
+  --font-mono:   'Courier New', Courier, monospace;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: var(--font-mono);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════ */
+header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,255,255,0.03);
+  flex-shrink: 0;
+}
+
+.header-title {
+  font-size: 28px;
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,255,255,0.4);
+}
+
+.header-sub {
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 2px;
+  margin-left: 18px;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* THINKING... pulse badge */
+.thinking-badge {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.thinking-badge.active {
+  opacity: 1;
+  animation: thinkPulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes thinkPulse {
+  from { text-shadow: 0 0 4px var(--cyan); }
+  to   { text-shadow: 0 0 24px var(--cyan), 0 0 48px rgba(0,255,255,0.5); }
+}
+
+/* Connection status dot */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--orange);
+  transition: background 0.4s;
+  box-shadow: 0 0 8px currentColor;
+}
+.status-dot.connected { background: var(--green); }
+
+/* ═══════════════════════════════════════════════════════
+   MAIN — THREE PANELS
+═══════════════════════════════════════════════════════ */
+main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.panel:last-child { border-right: none; }
+
+/* Widths */
+.panel-left   { width: 30%; }
+.panel-center { width: 40%; }
+.panel-right  { width: 30%; }
+
+.panel-title {
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LEFT — MEMORY STREAM
+═══════════════════════════════════════════════════════ */
+#memory-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.memory-entry {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateY(-12px);
+  animation: slideIn 0.4s ease forwards;
+}
+@keyframes slideIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.memory-entry.has-related {
+  border-left: 2px solid var(--green);
+  padding-left: 14px;
+}
+.memory-entry.has-concept {
+  border-left: 2px solid var(--purple);
+  padding-left: 14px;
+}
+
+.mem-number   { color: var(--dim); font-size: 9px; margin-bottom: 3px; }
+.mem-question { color: var(--white); font-size: 11px; line-height: 1.4; margin-bottom: 4px; }
+.mem-answer   { color: var(--dim); font-size: 10px; line-height: 1.3; margin-bottom: 4px;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                overflow: hidden; }
+.mem-meta     { display: flex; gap: 10px; flex-wrap: wrap; }
+.mem-tag {
+  font-size: 9px; padding: 1px 6px; border-radius: 2px;
+  background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3);
+}
+.mem-sim { font-size: 9px; color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════
+   CENTER — KNOWLEDGE GRAPH
+═══════════════════════════════════════════════════════ */
+#graph-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center,
+    rgba(0,255,255,0.03) 0%, transparent 70%);
+}
+
+/* Dot-grid background (circuit board feel) */
+#graph-container::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(0,255,255,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+
+#graph-svg {
+  width: 100%; height: 100%;
+  overflow: visible;
+}
+
+/* D3 node styling */
+.node-circle {
+  cursor: pointer;
+  transition: filter 0.3s;
+}
+.node-circle:hover { filter: brightness(1.4); }
+
+.node-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--white);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.graph-link {
+  stroke: var(--cyan);
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+}
+.graph-link.active {
+  stroke-opacity: 0.9;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px var(--cyan));
+}
+
+/* Ring animation on new node */
+@keyframes ringExpand {
+  0%   { r: 0px;  opacity: 1; }
+  100% { r: 70px; opacity: 0; }
+}
+.new-node-ring {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  animation: ringExpand 1.2s ease-out forwards;
+}
+
+/* Tooltip */
+#graph-tooltip {
+  position: absolute;
+  background: rgba(10,10,15,0.95);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  max-width: 200px;
+  z-index: 10;
+}
+#graph-tooltip.visible { opacity: 1; }
+#graph-tooltip .tt-name  { color: var(--cyan); font-size: 13px; margin-bottom: 5px; }
+#graph-tooltip .tt-line  { color: var(--dim); margin-bottom: 2px; }
+#graph-tooltip .tt-kw    { color: var(--purple); }
+
+/* ═══════════════════════════════════════════════════════
+   RIGHT — COGNITIVE STATUS
+═══════════════════════════════════════════════════════ */
+#status-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.status-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.section-label {
+  font-size: 8px; letter-spacing: 3px; color: var(--dim);
+  text-transform: uppercase; margin-bottom: 10px;
+}
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-box {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  text-align: center;
+}
+.stat-value { font-size: 22px; color: var(--cyan); font-weight: bold; }
+.stat-label { font-size: 8px; color: var(--dim); letter-spacing: 1px; margin-top: 2px; }
+
+/* Thought stream */
+#thought-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.thought-entry {
+  background: rgba(168,85,247,0.06);
+  border: 1px solid rgba(168,85,247,0.2);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--purple);
+  min-height: 36px;
+}
+.thought-cursor { 
+  display: inline-block; width: 6px; height: 10px;
+  background: var(--purple); vertical-align: middle;
+  animation: cursorBlink 0.7s step-end infinite;
+}
+@keyframes cursorBlink { 50% { opacity: 0; } }
+
+/* Audit panel */
+.audit-item {
+  font-size: 10px;
+  padding: 4px 0;
+  line-height: 1.4;
+  color: var(--dim);
+}
+.audit-warn  { color: var(--orange); }
+.audit-combo { color: var(--purple); }
+.audit-ok    { color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════
+   FOOTER — INPUT
+═══════════════════════════════════════════════════════ */
+footer {
+  height: var(--footer-h);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+#question-input {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  color: var(--white);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+#question-input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(0,255,255,0.15);
+}
+#question-input::placeholder { color: rgba(255,255,255,0.2); }
+#question-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#ask-btn {
+  background: rgba(0,255,255,0.1);
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+#ask-btn:hover:not(:disabled) {
+  background: rgba(0,255,255,0.2);
+  box-shadow: 0 0 16px rgba(0,255,255,0.3);
+}
+#ask-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="header-title">ATHENA</div>
+  <div class="header-sub">Autonomous Thought Heuristic Engine for Neural Abstraction</div>
+  <div class="header-right">
+    <span class="thinking-badge" id="thinking-badge">THINKING...</span>
+    <span class="status-dot" id="status-dot" title="SSE connection"></span>
+  </div>
+</header>
+
+<!-- ═══════════════ THREE PANELS ═══════════════ -->
+<main>
+
+  <!-- LEFT: Memory Stream -->
+  <div class="panel panel-left">
+    <div class="panel-title">Memory Stream</div>
+    <div id="memory-list"></div>
+  </div>
+
+  <!-- CENTER: Knowledge Graph -->
+  <div class="panel panel-center">
+    <div class="panel-title">Knowledge Graph</div>
+    <div id="graph-container">
+      <svg id="graph-svg"></svg>
+      <div id="graph-tooltip">
+        <div class="tt-name" id="tt-name"></div>
+        <div class="tt-line" id="tt-freq"></div>
+        <div class="tt-line tt-kw" id="tt-kw"></div>
+        <div class="tt-line" id="tt-since"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Cognitive Status -->
+  <div class="panel panel-right">
+    <div class="panel-title">Cognitive Status</div>
+    <div id="status-container">
+
+      <!-- Stats -->
+      <div class="status-section">
+        <div class="section-label">System Stats</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-value" id="stat-memories">0</div>
+            <div class="stat-label">Memories</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="stat-symbols">0</div>
+            <div class="stat-label">Symbols</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="stat-edges">0</div>
+            <div class="stat-label">Graph Edges</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="stat-uptime">0s</div>
+            <div class="stat-label">Uptime</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thought Stream -->
+      <div class="status-section">
+        <div class="section-label">Thought Stream</div>
+        <div id="thought-stream">
+          <div class="thought-entry" id="thought-0">—</div>
+          <div class="thought-entry" id="thought-1">—</div>
+          <div class="thought-entry" id="thought-2">—</div>
+        </div>
+      </div>
+
+      <!-- Audit Status -->
+      <div class="status-section" style="flex:1;">
+        <div class="section-label">Audit Status</div>
+        <div id="audit-panel">
+          <div class="audit-item" style="color:var(--dim);">No audit run yet.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════ FOOTER / INPUT ═══════════════ -->
+<footer>
+  <input id="question-input" type="text"
+         placeholder="Ask ATHENA something…" autocomplete="off">
+  <button id="ask-btn">ASK</button>
+</footer>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════ -->
+<script>
+/* ──────────────────────────────────────────────────────
+   CONFIGURATION
+   API_BASE auto-detects: same host as where HTML is served.
+────────────────────────────────────────────────────── */
+const API_BASE = window.location.origin;   // e.g. http://127.0.0.1:8000
+
+/* ──────────────────────────────────────────────────────
+   STATE
+────────────────────────────────────────────────────── */
+const state = {
+  memories:     [],      // array of memory entry objects
+  graphNodes:   [],      // D3 node data
+  graphLinks:   [],      // D3 link data
+  stats:        { total_memories: 0, total_symbols: 0, graph_edges: 0, uptime_seconds: 0 },
+  thoughtBuf:   ['', '', ''],  // last 3 compressed thoughts
+  thoughtIdx:   0,             // which slot to write next (circular)
+  isThinking:   false,
+  activeNodes:  new Set(),     // node IDs currently "active" (glowing cyan)
+  memCount:     0,             // for display numbering
+};
+
+/* ──────────────────────────────────────────────────────
+   UPTIME TICKER — updates every second
+────────────────────────────────────────────────────── */
+let _uptimeBase = 0;
+setInterval(() => {
+  if (_uptimeBase > 0) {
+    const elapsed = Math.floor((Date.now() / 1000) - _uptimeBase +
+                               state.stats.uptime_seconds);
+    document.getElementById('stat-uptime').textContent =
+      elapsed < 60 ? `${elapsed}s` :
+      elapsed < 3600 ? `${Math.floor(elapsed/60)}m` :
+      `${Math.floor(elapsed/3600)}h`;
+  }
+}, 1000);
+
+/* ──────────────────────────────────────────────────────
+   GRAPH (D3 FORCE-DIRECTED)
+────────────────────────────────────────────────────── */
+let simulation, svgG, linkSel, nodeSel;
+let idleAngle = 0;
+let idleTimer = null;
+let lastActivity = Date.now();
+
+function initGraph() {
+  const svg    = d3.select('#graph-svg');
+  const container = document.getElementById('graph-container');
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  // Main group (everything goes inside)
+  svgG = svg.append('g').attr('class', 'graph-root');
+
+  // Arrow marker for edge direction (optional — looks cool)
+  svg.append('defs').append('marker')
+    .attr('id', 'arrow')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 22).attr('refY', 0)
+    .attr('markerWidth', 4).attr('markerHeight', 4)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', '#00ffff')
+    .attr('opacity', 0.4);
+
+  // Links group
+  linkSel = svgG.append('g').attr('class', 'links').selectAll('.graph-link');
+  // Nodes group
+  nodeSel = svgG.append('g').attr('class', 'nodes').selectAll('.node-g');
+
+  // Force simulation
+  simulation = d3.forceSimulation()
+    .force('link', d3.forceLink().id(d => d.id).distance(130).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-350))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide(40))
+    .on('tick', ticked);
+
+  // Idle rotation — rotate the whole graph slowly when idle
+  requestAnimationFrame(idleLoop);
+}
+
+function idleLoop() {
+  const IDLE_DELAY = 4000;   // ms of inactivity before rotation starts
+  const SPEED      = 0.003;  // degrees per frame
+  if (!state.isThinking && (Date.now() - lastActivity > IDLE_DELAY)) {
+    idleAngle = (idleAngle + SPEED) % 360;
+    const container = document.getElementById('graph-container');
+    if (container && svgG) {
+      const cx = container.clientWidth  / 2;
+      const cy = container.clientHeight / 2;
+      svgG.attr('transform',
+        `rotate(${idleAngle}, ${cx}, ${cy})`);
+    }
+  }
+  requestAnimationFrame(idleLoop);
+}
+
+function resetIdle() {
+  lastActivity = Date.now();
+  if (svgG) svgG.attr('transform', null);
+  idleAngle = 0;
+}
+
+function ticked() {
+  linkSel
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+  nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+}
+
+function updateGraph(nodes, links, newNodeId = null) {
+  // Preserve existing node positions
+  const posMap = {};
+  (state.graphNodes || []).forEach(n => {
+    posMap[n.id] = { x: n.x, y: n.y, vx: n.vx, vy: n.vy };
+  });
+
+  // Merge positions into new node data
+  nodes.forEach(n => {
+    if (posMap[n.id]) Object.assign(n, posMap[n.id]);
+  });
+
+  state.graphNodes = nodes;
+  state.graphLinks = links;
+
+  // ── Links ──
+  linkSel = svgG.select('.links')
+    .selectAll('.graph-link')
+    .data(links, d => `${d.source.id || d.source}→${d.target.id || d.target}`)
+    .join(
+      enter => enter.append('line')
+        .attr('class', 'graph-link')
+        .attr('marker-end', 'url(#arrow)'),
+      update => update,
+      exit   => exit.remove()
+    );
+
+  // ── Nodes ──
+  const nodeUpdate = svgG.select('.nodes')
+    .selectAll('.node-g')
+    .data(nodes, d => d.id);
+
+  const nodeEnter = nodeUpdate.enter()
+    .append('g')
+    .attr('class', 'node-g')
+    .call(d3.drag()
+      .on('start', dragStart)
+      .on('drag',  dragged)
+      .on('end',   dragEnd))
+    .on('mouseover', showTooltip)
+    .on('mousemove', moveTooltip)
+    .on('mouseout',  hideTooltip);
+
+  // Circle
+  nodeEnter.append('circle')
+    .attr('class', 'node-circle')
+    .attr('r', 0)
+    .transition().duration(400)
+    .attr('r', d => nodeRadius(d));
+
+  // Label
+  nodeEnter.append('text')
+    .attr('class', 'node-label')
+    .attr('dy', '0.35em')
+    .text(d => d.id)
+    .attr('opacity', 0)
+    .transition().duration(400)
+    .attr('opacity', 1);
+
+  // Ring animation for brand-new nodes
+  if (newNodeId) {
+    const newG = svgG.select('.nodes')
+      .selectAll('.node-g')
+      .filter(d => d.id === newNodeId);
+    newG.append('circle')
+      .attr('class', 'new-node-ring')
+      .attr('r', 0);
+  }
+
+  // Merge enter + update, re-apply colours and sizes
+  nodeSel = nodeUpdate.merge(nodeEnter);
+  nodeSel.select('.node-circle')
+    .transition().duration(300)
+    .attr('r', d => nodeRadius(d))
+    .attr('fill', d => nodeColor(d))
+    .attr('stroke', d => state.activeNodes.has(d.id)
+      ? '#ffffff' : 'rgba(255,255,255,0.15)')
+    .attr('stroke-width', d => state.activeNodes.has(d.id) ? 2 : 1)
+    .style('filter', d => state.activeNodes.has(d.id)
+      ? `drop-shadow(0 0 8px ${nodeColor(d)})` : 'none');
+
+  nodeUpdate.exit().remove();
+
+  // Feed new data into simulation
+  simulation
+    .nodes(nodes)
+    .force('link').links(links);
+  simulation.alpha(0.5).restart();
+}
+
+function nodeRadius(d) {
+  // Frequency 1 → r=14, scales logarithmically up to r=36
+  return Math.max(14, Math.min(36, 10 + Math.log2(d.frequency + 1) * 7));
+}
+
+function nodeColor(d) {
+  if (state.activeNodes.has(d.id)) return '#00ffff';  // active: cyan
+  if (d.isContradiction)           return '#ff6b35';  // contradiction: orange
+  return '#7c3aed';                                   // default: purple
+}
+
+/* Drag handlers */
+function dragStart(event, d) {
+  resetIdle();
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+function dragEnd(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+/* Tooltip */
+const tooltip = document.getElementById('graph-tooltip');
+function showTooltip(event, d) {
+  document.getElementById('tt-name').textContent = d.id;
+  document.getElementById('tt-freq').textContent =
+    `Frequency: ${d.frequency}`;
+  document.getElementById('tt-kw').textContent =
+    `Keywords: ${(d.keywords || []).join(', ')}`;
+  document.getElementById('tt-since').textContent =
+    d.createdAt ? `Born: ${d.createdAt.split('T')[0]}` : '';
+  tooltip.classList.add('visible');
+  moveTooltip(event);
+}
+function moveTooltip(event) {
+  const box = document.getElementById('graph-container').getBoundingClientRect();
+  let x = event.clientX - box.left + 12;
+  let y = event.clientY - box.top  + 12;
+  if (x + 200 > box.width)  x -= 220;
+  if (y + 120 > box.height) y -= 130;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+/* ──────────────────────────────────────────────────────
+   MEMORY STREAM
+────────────────────────────────────────────────────── */
+function prependMemory(entry) {
+  state.memCount++;
+  const list  = document.getElementById('memory-list');
+  const div   = document.createElement('div');
+  const klass = entry.had_related  ? 'memory-entry has-related' :
+                entry.has_concept  ? 'memory-entry has-concept'  :
+                                     'memory-entry';
+  div.className = klass;
+
+  const simStr = typeof entry.similarity === 'number' && entry.similarity > 0
+    ? `<span class="mem-sim">∼ ${(entry.similarity * 100).toFixed(0)}% match</span>`
+    : '';
+
+  const kwTags = (entry.keywords || [])
+    .map(k => `<span class="mem-tag">${k}</span>`).join('');
+
+  div.innerHTML = `
+    <div class="mem-number">Memory #${entry.id || state.memCount} · ${timeAgo(entry.timestamp)}</div>
+    <div class="mem-question">${escHtml(entry.user_input)}</div>
+    <div class="mem-answer">${escHtml(entry.answer)}</div>
+    <div class="mem-meta">${kwTags}${simStr}</div>
+  `;
+  list.insertBefore(div, list.firstChild);
+
+  // Keep only last 50 entries in DOM (performance)
+  while (list.children.length > 50) {
+    list.removeChild(list.lastChild);
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   THOUGHT STREAM (typewriter)
+────────────────────────────────────────────────────── */
+let _typeQueue = [];
+let _typing = false;
+
+function enqueueThought(text) {
+  _typeQueue.push(text);
+  if (!_typing) typeNext();
+}
+
+function typeNext() {
+  if (_typeQueue.length === 0) { _typing = false; return; }
+  _typing = true;
+  const text = _typeQueue.shift();
+
+  // Rotate through 3 slots
+  const slot = state.thoughtIdx % 3;
+  state.thoughtIdx++;
+  const el = document.getElementById(`thought-${slot}`);
+  el.textContent = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'thought-cursor';
+  el.appendChild(cursor);
+
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < text.length) {
+      el.insertBefore(document.createTextNode(text[i++]), cursor);
+    } else {
+      clearInterval(interval);
+      cursor.remove();
+      typeNext();
+    }
+  }, 18);   // ~55 chars/sec
+}
+
+/* ──────────────────────────────────────────────────────
+   STATS
+────────────────────────────────────────────────────── */
+function updateStats(stats) {
+  if (!stats) return;
+  Object.assign(state.stats, stats);
+  document.getElementById('stat-memories').textContent = stats.total_memories;
+  document.getElementById('stat-symbols').textContent  = stats.total_symbols;
+  document.getElementById('stat-edges').textContent    = stats.graph_edges;
+}
+
+/* ──────────────────────────────────────────────────────
+   AUDIT PANEL
+────────────────────────────────────────────────────── */
+function updateAudit(data) {
+  const panel = document.getElementById('audit-panel');
+  if (!data) return;
+  const lines = [];
+
+  if (data.contradiction_candidates && data.contradiction_candidates.length) {
+    data.contradiction_candidates.forEach(c => {
+      lines.push(`<div class="audit-item audit-warn">⚠ ${escHtml(c)}: possible contradiction</div>`);
+    });
+  }
+  if (data.combinable_pairs && data.combinable_pairs.length) {
+    data.combinable_pairs.forEach(([a,b]) => {
+      lines.push(`<div class="audit-item audit-combo">⟳ ${escHtml(a)} + ${escHtml(b)} → combinable</div>`);
+    });
+  }
+  if (data.active_symbols && data.active_symbols.length) {
+    lines.push(`<div class="audit-item audit-ok">✓ ${data.active_symbols.length} active symbols</div>`);
+  }
+  if (data.weak_symbols && data.weak_symbols.length) {
+    lines.push(`<div class="audit-item">  ${data.weak_symbols.length} weak symbols</div>`);
+  }
+  panel.innerHTML = lines.length ? lines.join('') : '<div class="audit-item audit-ok">✓ Graph healthy</div>';
+}
+
+/* ──────────────────────────────────────────────────────
+   SSE — SERVER-SENT EVENTS
+────────────────────────────────────────────────────── */
+let sse = null;
+
+function connectSSE() {
+  if (sse) { sse.close(); sse = null; }
+  sse = new EventSource(`${API_BASE}/api/stream`);
+
+  sse.onopen = () => {
+    document.getElementById('status-dot').classList.add('connected');
+    console.log('[SSE] Connected');
+  };
+
+  sse.onerror = () => {
+    document.getElementById('status-dot').classList.remove('connected');
+    console.warn('[SSE] Disconnected — reconnecting in 3s');
+    sse.close();
+    setTimeout(connectSSE, 3000);
+  };
+
+  sse.onmessage = ev => {
+    let event;
+    try { event = JSON.parse(ev.data); }
+    catch (e) { return; }
+    handleSSEEvent(event);
+  };
+}
+
+function handleSSEEvent(event) {
+  resetIdle();
+  const { type, data } = event;
+
+  if (type === 'thinking_start') {
+    state.isThinking = true;
+    document.getElementById('thinking-badge').classList.add('active');
+    setInputEnabled(false);
+    enqueueThought(`Thinking: "${(data.question || '').slice(0, 60)}…"`);
+  }
+
+  if (type === 'thinking_end') {
+    state.isThinking = false;
+    document.getElementById('thinking-badge').classList.remove('active');
+    setInputEnabled(true);
+    if (data.answer) enqueueThought(data.answer.slice(0, 120));
+  }
+
+  if (type === 'memory_stored') {
+    prependMemory(data);
+    updateStats({ total_memories: (state.stats.total_memories || 0) + 1,
+                  total_symbols:  state.stats.total_symbols,
+                  graph_edges:    state.stats.graph_edges,
+                  uptime_seconds: state.stats.uptime_seconds });
+  }
+
+  if (type === 'symbol_born') {
+    // Add node immediately with animation
+    const newNode = {
+      id:        data.name,
+      keywords:  data.keywords,
+      frequency: data.frequency,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = state.graphNodes.find(n => n.id === data.name);
+    if (!existing) {
+      state.graphNodes.push(newNode);
+      state.activeNodes.add(data.name);
+      updateGraph(state.graphNodes, state.graphLinks, data.name);
+      setTimeout(() => {
+        state.activeNodes.delete(data.name);
+        updateGraph(state.graphNodes, state.graphLinks);
+      }, 3000);
+    }
+    enqueueThought(`Symbol born: ${data.name} (${(data.keywords||[]).join(', ')})`);
+    updateStats({ ...state.stats, total_symbols: (state.stats.total_symbols||0)+1 });
+  }
+
+  if (type === 'concept_emerging') {
+    enqueueThought(`Concept emerging: [${(data.keywords||[]).join(', ')}] × ${data.frequency}`);
+  }
+
+  if (type === 'audit_complete') {
+    updateAudit(data);
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   INITIAL STATE LOAD
+────────────────────────────────────────────────────── */
+async function loadInitialState() {
+  try {
+    const resp = await fetch(`${API_BASE}/api/state`);
+    if (!resp.ok) throw new Error(resp.statusText);
+    const data = await resp.json();
+
+    // Memories (server returns newest first — we prepend, so reverse to insert oldest first)
+    [...(data.memories || [])].reverse().forEach(m => prependMemory(m));
+
+    // Graph
+    updateGraph(data.graph.nodes || [], data.graph.links || []);
+
+    // Stats
+    _uptimeBase = Date.now() / 1000;  // anchor uptime ticker
+    updateStats(data.stats);
+
+  } catch (err) {
+    console.error('[Init] Failed to load state:', err);
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   SEND QUESTION
+────────────────────────────────────────────────────── */
+async function sendQuestion() {
+  const input = document.getElementById('question-input');
+  const q     = input.value.trim();
+  if (!q || state.isThinking) return;
+
+  input.value = '';
+  resetIdle();
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/interact`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ question: q }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      console.error('[API] Error:', err);
+      setInputEnabled(true);
+      state.isThinking = false;
+      document.getElementById('thinking-badge').classList.remove('active');
+      return;
+    }
+
+    // The response contains the final state — sync graph + stats
+    const result = await resp.json();
+    if (result.graph) updateGraph(result.graph.nodes||[], result.graph.links||[]);
+    if (result.stats) updateStats(result.stats);
+
+  } catch (err) {
+    console.error('[API] Network error:', err);
+    setInputEnabled(true);
+    state.isThinking = false;
+    document.getElementById('thinking-badge').classList.remove('active');
+  }
+}
+
+/* ──────────────────────────────────────────────────────
+   UI HELPERS
+────────────────────────────────────────────────────── */
+function setInputEnabled(enabled) {
+  document.getElementById('question-input').disabled = !enabled;
+  document.getElementById('ask-btn').disabled        = !enabled;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;');
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60)   return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return `${Math.floor(diff/3600)}h ago`;
+}
+
+/* ──────────────────────────────────────────────────────
+   EVENT LISTENERS
+────────────────────────────────────────────────────── */
+document.getElementById('ask-btn').addEventListener('click', sendQuestion);
+
+document.getElementById('question-input').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && !ev.shiftKey) {
+    ev.preventDefault();
+    sendQuestion();
+  }
+});
+
+/* ──────────────────────────────────────────────────────
+   BOOT
+────────────────────────────────────────────────────── */
+window.addEventListener('load', () => {
+  initGraph();
+  connectSSE();
+  loadInitialState();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+I am building ATHENA — Autonomous Thought Heuristic Engine for Neural Abstraction.
+
+Phases 1 through 5 are complete and working. Here is the exact current state:
+
+CURRENT FOLDER STRUCTURE:
+athena/
+├── core/
+│   ├── model.py        # Ollama API (phi3:mini)
+│   ├── reasoning.py    # inference loop
+│   ├── memory.py       # full memory stack + run_session_audit()
+│   ├── embeddings.py   # all-MiniLM-L6-v2
+│   ├── compressor.py   # ThoughtRecord compression
+│   ├── patterns.py     # CandidateConcept detection
+│   ├── symbols.py      # Symbol assignment
+│   ├── combiner.py     # Symbol combination
+│   ├── auditor.py      # AuditReport generation
+│   └── graph.py        # GraphManager (dict-based, save/load JSON)
+├── database/
+│   └── sqlite.py       # interactions + symbols tables
+├── api/
+│   └── server.py       # FastAPI (installed, not yet used)
+├── logs/
+│   └── athena.log
+├── data/
+│   ├── athena.db
+│   └── graph.json      # persisted knowledge graph
+├── config.py
+├── requirements.txt
+└── main.py             # REPL with full Phase 1-5 output
+
+HARDWARE:
+- Intel Core i5-7200U, 8GB RAM, Intel HD 620, Windows 10 Pro
+- Ollama on port 11434, Python 3.11
+
+---
+
+PHASE 6 GOAL
+Build a real-time web dashboard that visualizes ATHENA's mind as it thinks.
+
+This is the demo that makes people stop scrolling.
+
+The dashboard runs alongside ATHENA in a browser. Every time ATHENA
+answers a question, the dashboard updates live — no refresh needed.
+The knowledge graph pulses. New symbols explode into existence.
+Thought compressions stream in. The audit report glows.
+
+This is not a report page. This is a live window into a thinking machine.
+
+---
+
+WHAT THE DASHBOARD MUST LOOK LIKE
+
+Full dark theme. Deep space black background (#0a0a0f).
+Neon accent colors:
+  - Cyan (#00ffff) for active symbols and edges
+  - Purple (#a855f7) for emerging concepts
+  - Green (#00ff88) for stored memories
+  - Orange (#ff6b35) for contradictions and warnings
+  - White (#ffffff) for text
+
+Layout — three panels side by side:
+
+LEFT PANEL — "MEMORY STREAM" (30% width)
+  - Scrolling live feed of every interaction
+  - Each entry shows: question, answer snippet, similarity score if matched
+  - New entries slide in from the top with a fade animation
+  - Color coded: green glow if related memory found, purple if concept emerging
+  - Shows: "Memory #N | similarity: 0.82 | keywords: [recursion, function]"
+
+CENTER PANEL — "KNOWLEDGE GRAPH" (40% width)
+  - D3.js force-directed graph
+  - Nodes = symbols (RECURSION, REFERS, etc.)
+  - Node size scales with frequency — more seen = bigger node
+  - Node color: cyan if active, orange if contradiction candidate
+  - Edges glow cyan when two symbols are connected
+  - When a new symbol appears: node materializes with an expanding ring animation
+  - When symbols combine: two nodes merge with a particle burst effect
+  - Nodes have labels. Hovering shows: name, frequency, keywords, first seen
+  - The graph slowly rotates when idle — it looks alive
+  - Background: subtle grid of dots (like a circuit board)
+
+RIGHT PANEL — "COGNITIVE STATUS" (30% width)
+  - Top section: ATHENA system stats
+      - Total memories stored
+      - Active symbols count
+      - Graph edges count
+      - Session uptime
+  - Middle section: live "THOUGHT STREAM"
+      - Shows the last 3 compressed summaries as they come in
+      - Each one types in character by character (typewriter effect)
+  - Bottom section: AUDIT STATUS
+      - Live audit report from last session end
+      - Contradiction warnings glow orange
+      - Combinable pairs highlighted purple
+
+HEADER — full width
+  - "ATHENA" in large monospace font, glowing cyan
+  - Subtitle: "Autonomous Thought Heuristic Engine for Neural Abstraction"
+  - Top right: connection status dot (green = connected, red = disconnected)
+  - Top right: "THINKING..." pulse animation when inference is running
+
+---
+
+WHAT PHASE 6 MUST BUILD
+
+1. UPGRADE api/server.py — FastAPI backend
+   - GET  /api/state         → full current state (memories, symbols, graph, audit)
+   - GET  /api/graph         → graph.json contents
+   - POST /api/interact      → send a question, get ATHENA's answer
+   - GET  /api/stream        → SSE (Server-Sent Events) stream
+       → pushes events to browser in real time:
+           {"type": "memory_stored", "data": {...}}
+           {"type": "symbol_born", "data": {"name": "RECURSION", ...}}
+           {"type": "concept_emerging", "data": {...}}
+           {"type": "thinking_start", "data": {}}
+           {"type": "thinking_end", "data": {"answer": "..."}}
+           {"type": "audit_complete", "data": {...}}
+
+2. NEW dashboard/index.html — single file, zero build step
+   - Pure HTML + CSS + vanilla JS + D3.js from CDN
+   - No React, no Node, no npm — just open in browser
+   - Connects to FastAPI via SSE for live updates
+   - Connects to /api/interact to send questions
+   - The input box at the bottom lets you talk to ATHENA from the browser
+   - Everything described in the visual spec above
+   - D3.js version 7 from cdnjs
+
+3. UPGRADE main.py
+   - Add --web flag: python main.py --web
+   - When --web is used: start FastAPI server + open browser automatically
+   - When no flag: run normal REPL as before (backward compatible)
+   - FastAPI runs on port 8000
+   - uvicorn runs in a background thread so ATHENA's REPL still works
+
+4. NEW dashboard/ folder
+   dashboard/
+   └── index.html    # the entire frontend — one file
+
+---
+
+CONSTRAINTS
+- index.html must be a single self-contained file
+- D3.js loaded from cdnjs CDN — no local install
+- FastAPI SSE must work without any CORS issues (add middleware)
+- No React, no Vue, no build tools
+- All new config constants:
+    API_HOST = "127.0.0.1"
+    API_PORT = 8000
+- The REPL still works normally without --web flag
+- server.py must be independently runnable: python api/server.py
+
+---
+
+SUCCESS CONDITION
+python main.py --web
+
+Browser opens automatically to http://localhost:8000/dashboard
+
+The knowledge graph is visible with RECURSION and REFERS as nodes.
+User types "What is a binary search tree?" in the browser input.
+The header shows "THINKING..." with a pulse.
+14 seconds later the answer appears.
+A new memory entry slides into the left panel.
+If a new symbol forms, a node explodes into the graph with a ring animation.
+The cognitive status panel updates live.
+
+Someone watching this for the first time says:
+"What the hell is this. Is this real."
+
+---
+
+CODE QUALITY
+- index.html: well commented, sections clearly labeled
+- server.py: clean FastAPI, proper SSE implementation
+- main.py changes: minimal, backward compatible
+- A developer must understand every file after reading once
+
+DELIVERABLES
+1. New dashboard/index.html (the entire frontend)
+2. Updated api/server.py (FastAPI + SSE)
+3. Updated main.py (--web flag, uvicorn thread)
+4. Updated config.py (API_HOST, API_PORT)
+5. How to run with --web flag
+6. How to verify the success condition
