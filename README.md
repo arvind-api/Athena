@@ -244,6 +244,17 @@ ATHENA follows a few simple rules:
 * Research over hype
 
 ---
+User
+   │
+Dashboard
+   │
+FastAPI
+   │
+Reasoning Engine
+   │
+SQLite Memory
+   │
+Knowledge Graph
 
 ## Current Status
 
